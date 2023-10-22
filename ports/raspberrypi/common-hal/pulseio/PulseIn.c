@@ -55,6 +55,8 @@ void common_hal_pulseio_pulsein_construct(pulseio_pulsein_obj_t *self,
     self->idle_state = idle_state;
     self->start = 0;
     self->len = 0;
+    self->len_locked = false;
+    self->len_incr = false;
 
     common_hal_rp2pio_statemachine_construct(&self->state_machine,
         pulsein_program, MP_ARRAY_SIZE(pulsein_program),
@@ -134,6 +136,7 @@ void common_hal_pulseio_pulsein_interrupt(void *self_in) {
                     self->buffer[buf_index] = (uint16_t)result;
                     if (self->len < self->maxlen) {
                         self->len++;
+                        self->len_incr = self->len_locked;
                     } else {
                         self->start = (self->start + 1) % self->maxlen;
                     }
@@ -175,7 +178,11 @@ uint16_t common_hal_pulseio_pulsein_popleft(pulseio_pulsein_obj_t *self) {
     }
     uint16_t value = self->buffer[self->start];
     self->start = (self->start + 1) % self->maxlen;
+    self->len_locked = true;
     self->len--;
+    self->len_locked = false;
+    self->len += (uint16_t)self->len_incr;
+    self->len_incr = false;
     return value;
 }
 
